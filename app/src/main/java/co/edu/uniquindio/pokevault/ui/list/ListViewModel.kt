@@ -13,7 +13,8 @@ import javax.inject.Inject
 
 class ListViewModel @Inject constructor(
     private val repository: PokemonRepository
-): ViewModel() {
+) : ViewModel() {
+
     private val _uiState = MutableStateFlow(ListUiState())
     val uiState: StateFlow<ListUiState> = _uiState.asStateFlow()
 
@@ -32,12 +33,12 @@ class ListViewModel @Inject constructor(
     }
 
     fun loadNextPage() {
-        if(_uiState.value.isLoadingPage || !_uiState.value.canLoadMore) return
+        if (_uiState.value.isLoadingPage || !_uiState.value.canLoadMore) return
 
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingPage = true) }
             val state = _uiState.value
-            when (val result = repository.getPokemonList(state.currentPage, state.searchQuery, state.selectedType)){
+            when (val result = repository.getPokemonList(state.currentPage, state.searchQuery, state.selectedType)) {
                 is Resource.Success -> {
                     val newItems = result.data
                     _uiState.update {
