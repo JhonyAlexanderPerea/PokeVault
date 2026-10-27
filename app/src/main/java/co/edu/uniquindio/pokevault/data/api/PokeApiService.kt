@@ -8,19 +8,29 @@ import retrofit2.http.Query
 
 
 interface PokeApiService {
+    // Endpoint 1: Lista paginada
     @GET("pokemon")
     suspend fun getPokemonList(
-        @Query("limit") limit: Int =20,
+        @Query("limit") limit: Int = 20,
         @Query("offset") offset: Int = 0
-    ): PokemoListResponseDto
+    ): PokemonListResponseDto
 
-    @GET("pokemo/{idOrName}")
-    suspend fun getPokemonDetail(@Path("idOrName") idOrName: String): PokemonDetailDto
+    // Endpoint 2: Detalle por ID o nombre
+    @GET("pokemon/{idOrName}")
+    suspend fun getPokemonDetail(
+        @Path("idOrName") idOrName: String
+    ): PokemonDetailDto
 
+    // Endpoint 3: Filtro por tipo
     @GET("type/{typeName}")
-    suspend fun getPokemobyType(@Path("typeName") typeName: String): PokemonTypeResponseDto
+    suspend fun getPokemonByType(
+        @Path("typeName") typeName: String
+    ): PokemonTypeResponseDto
 
+    // Endpoint 4: Descripción de la especie
     @GET("pokemon-species/{idOrName}")
-    suspend fun getPokemonSpecies(@Path("idOrName") idOrName: String): PokemonSpeciesDto
+    suspend fun getPokemonSpecies(
+        @Path("idOrName") idOrName: String
+    ): PokemonSpeciesDto
 
 }

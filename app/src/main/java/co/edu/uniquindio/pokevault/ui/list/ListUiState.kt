@@ -7,7 +7,7 @@ data class ListUiState (
     val pokemons: List<Pokemon> = emptyList(),
     val searchQuery: String = "",
     val selectedType: String = "",
-    val isLoadingPage: Boolean = true,
+    val isLoadingPage: Boolean = false,
     val currentPage: Int = 1,
     val canLoadMore: Boolean = true,
     val error: String? = null
