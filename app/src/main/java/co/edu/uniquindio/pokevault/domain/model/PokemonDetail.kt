@@ -12,5 +12,7 @@ data class PokemonDetail(
     val attack: Int,
     val defense: Int,
     val speed: Int,
-    val description: String
+    val description: String,
+    val descriptionEs: String,
+    val descriptionEn: String
 )
