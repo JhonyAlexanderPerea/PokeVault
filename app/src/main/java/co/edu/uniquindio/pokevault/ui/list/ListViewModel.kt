@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import co.edu.uniquindio.pokevault.domain.repository.PokemonRepository
 import co.edu.uniquindio.pokevault.util.Resource
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -11,6 +12,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+@HiltViewModel
 class ListViewModel @Inject constructor(
     private val repository: PokemonRepository
 ) : ViewModel() {
@@ -46,7 +48,7 @@ class ListViewModel @Inject constructor(
                             pokemons = it.pokemons + newItems,
                             isLoadingPage = false,
                             currentPage = it.currentPage + 1,
-                            canLoadMore = newItems.isNotEmpty() && state.searchQuery.isBlank() && state.selectedType.isBlank()
+                            canLoadMore = newItems.isNotEmpty() && newItems.size >= 20
                         )
                     }
                 }
