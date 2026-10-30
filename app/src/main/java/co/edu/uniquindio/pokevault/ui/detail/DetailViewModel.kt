@@ -9,14 +9,14 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-
 
 @HiltViewModel
 class DetailViewModel @Inject constructor(
     private val repository: PokemonRepository,
-    savedStateHandle: SavedStateHandle
+    private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DetailUiState())
@@ -28,12 +28,18 @@ class DetailViewModel @Inject constructor(
         }
     }
 
+    fun retry() {
+        savedStateHandle.get<String>("pokemonId")?.let { id ->
+            loadDetail(id)
+        }
+    }
+
     private fun loadDetail(id: String) {
         viewModelScope.launch {
-            _uiState.value = DetailUiState(isLoading = true)
+            _uiState.update { it.copy(isLoading = true, error = null) }
             when (val result = repository.getPokemonDetail(id)) {
-                is Resource.Success -> _uiState.value = DetailUiState(pokemon = result.data)
-                is Resource.Error -> _uiState.value = DetailUiState(error = result.message)
+                is Resource.Success -> _uiState.update { it.copy(pokemon = result.data, isLoading = false, error = null) }
+                is Resource.Error -> _uiState.update { it.copy(error = result.message, isLoading = false) }
                 else -> {}
             }
         }

@@ -9,35 +9,70 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+
+val LocalPokeVaultDarkTheme = staticCompositionLocalOf { false }
 
 private val DarkColorScheme = darkColorScheme(
     primary = Purple80,
+    onPrimary = OnPurple10,
+    primaryContainer = Purple30,
+    onPrimaryContainer = OnPurple90,
     secondary = PurpleGrey80,
-    tertiary = Pink80
+    onSecondary = OnPurpleGrey10,
+    secondaryContainer = PurpleGrey30,
+    onSecondaryContainer = OnPurpleGrey90,
+    tertiary = Pink80,
+    onTertiary = OnPink10,
+    tertiaryContainer = Pink30,
+    onTertiaryContainer = OnPink90,
+    background = DarkBackground,
+    onBackground = DarkOnBackground,
+    surface = DarkBackground,
+    onSurface = DarkOnBackground,
+    surfaceVariant = DarkSurfaceVariant,
+    onSurfaceVariant = DarkOnSurfaceVariant,
+    outline = DarkOutline,
+    error = DarkError,
+    onError = DarkOnError,
+    errorContainer = DarkErrorContainer,
+    onErrorContainer = DarkOnErrorContainer
 )
 
 private val LightColorScheme = lightColorScheme(
     primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
     onPrimary = Color.White,
+    primaryContainer = Purple90,
+    onPrimaryContainer = OnPurple10,
+    secondary = PurpleGrey40,
     onSecondary = Color.White,
+    secondaryContainer = PurpleGrey90,
+    onSecondaryContainer = OnPurpleGrey10,
+    tertiary = Pink40,
     onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    tertiaryContainer = Pink90,
+    onTertiaryContainer = OnPink10,
+    background = LightBackground,
+    onBackground = LightOnBackground,
+    surface = LightBackground,
+    onSurface = LightOnBackground,
+    surfaceVariant = LightSurfaceVariant,
+    onSurfaceVariant = LightOnSurfaceVariant,
+    outline = LightOutline,
+    error = LightError,
+    onError = Color.White,
+    errorContainer = LightErrorContainer,
+    onErrorContainer = LightOnErrorContainer
 )
 
 @Composable
 fun PokeVaultTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
@@ -50,9 +85,11 @@ fun PokeVaultTheme(
         else -> LightColorScheme
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    CompositionLocalProvider(LocalPokeVaultDarkTheme provides darkTheme) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
 }

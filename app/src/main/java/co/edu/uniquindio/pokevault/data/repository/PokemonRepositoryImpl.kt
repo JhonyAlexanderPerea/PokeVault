@@ -3,29 +3,64 @@ package co.edu.uniquindio.pokevault.data.repository
 import co.edu.uniquindio.pokevault.data.api.PokeApiService
 import co.edu.uniquindio.pokevault.domain.model.Pokemon
 import co.edu.uniquindio.pokevault.domain.model.PokemonDetail
+import co.edu.uniquindio.pokevault.domain.model.PokemonPage
 import co.edu.uniquindio.pokevault.domain.repository.PokemonRepository
 import co.edu.uniquindio.pokevault.util.Resource
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import javax.inject.Inject
 
 class PokemonRepositoryImpl @Inject constructor(
     private val apiService: PokeApiService
 ) : PokemonRepository {
 
+    private companion object {
+        const val PAGE_SIZE = 20
+        const val MAX_CACHED_PAGES = 100
+    }
+
+    private data class PageKey(
+        val page: Int,
+        val query: String,
+        val type: String
+    )
+
     private var cachedAllPokemons: List<Pokemon>? = null
+    private val cachedTypeLists = mutableMapOf<String, List<Pokemon>>()
+    private val cachedTypes = mutableMapOf<Int, List<String>>()
+    private val cachedPages = mutableMapOf<PageKey, PokemonPage>()
 
     private suspend fun getAllPokemons(): List<Pokemon> {
         cachedAllPokemons?.let { return it }
-        return try {
-            val response = apiService.getPokemonList(limit = 2000, offset = 0)
-            val list = response.results.map {
-                val id = extractId(it.url)
-                Pokemon(id, it.name.capitalize(), getImg(id))
-            }
-            cachedAllPokemons = list
-            list
-        } catch (e: Exception) {
-            emptyList()
+        val response = apiService.getPokemonList(limit = 2000, offset = 0)
+        val list = response.results.map {
+            val id = extractId(it.url)
+            Pokemon(id, it.name.capitalize(), getImg(id))
         }
+        cachedAllPokemons = list
+        return list
+    }
+
+    private suspend fun getPokemonsByType(cleanType: String): List<Pokemon> {
+        val englishType = mapTypeName(cleanType)
+        cachedTypeLists[englishType]?.let { return it }
+        val byType = apiService.getPokemonByType(englishType)
+        val list = byType.pokemon.map {
+            val id = extractId(it.pokemon.url)
+            Pokemon(id, it.pokemon.name.capitalize(), getImg(id), listOf(englishType))
+        }
+        cachedTypeLists[englishType] = list
+        return list
+    }
+
+    private suspend fun getTypes(id: Int): List<String> {
+        cachedTypes[id]?.let { return it }
+        val types = runCatching {
+            apiService.getPokemonDetail(id.toString()).types.map { it.type.name }
+        }.getOrNull().orEmpty()
+        if (types.isNotEmpty()) cachedTypes[id] = types
+        return types
     }
 
     private fun mapTypeName(input: String): String {
@@ -53,55 +88,57 @@ class PokemonRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun getPokemonList(page: Int, query: String, typeFilter: String): Resource<List<Pokemon>> {
+    override suspend fun getPokemonList(page: Int, query: String, typeFilter: String): Resource<PokemonPage> {
         return try {
             val cleanQuery = query.lowercase().trim()
             val cleanType = typeFilter.lowercase().trim()
+            val hasTypeFilter = cleanType.isNotBlank() && cleanType != "todos" && cleanType != "all"
+            val cacheKey = PageKey(page, cleanQuery, cleanType)
+            cachedPages[cacheKey]?.let { return Resource.Success(it) }
 
-            val baseList = if (cleanType.isNotBlank() && cleanType != "todos" && cleanType != "all") {
-                val englishType = mapTypeName(cleanType)
-                try {
-                    val byType = apiService.getPokemonByType(englishType)
-                    byType.pokemon.map {
-                        val id = extractId(it.pokemon.url)
-                        Pokemon(id, it.pokemon.name.capitalize(), getImg(id))
-                    }
-                } catch (e: Exception) {
-                    emptyList()
-                }
+            val baseList = if (hasTypeFilter) {
+                getPokemonsByType(cleanType)
             } else {
                 getAllPokemons()
             }
 
             val filteredList = if (cleanQuery.isNotBlank()) {
-                baseList.filter { 
+                baseList.filter {
                     it.name.lowercase().contains(cleanQuery) || it.id.toString() == cleanQuery
                 }
             } else {
                 baseList
             }
 
-            if (cleanQuery.isNotBlank() || (cleanType.isNotBlank() && cleanType != "todos" && cleanType != "all")) {
-                val pageSize = 20
-                val startIndex = (page - 1) * pageSize
-                val endIndex = minOf(startIndex + pageSize, filteredList.size)
-                val pagedList = if (startIndex < filteredList.size) {
-                    filteredList.subList(startIndex, endIndex)
-                } else {
-                    emptyList()
-                }
-                return Resource.Success(pagedList)
+            val startIndex = (page - 1) * PAGE_SIZE
+            val endIndex = minOf(startIndex + PAGE_SIZE, filteredList.size)
+            val slice = if (startIndex < filteredList.size) {
+                filteredList.subList(startIndex, endIndex)
+            } else {
+                emptyList()
             }
 
-            val offset = (page - 1) * 20
-            val response = apiService.getPokemonList(limit = 20, offset = offset)
-            val list = response.results.map {
-                val id = extractId(it.url)
-                Pokemon(id, it.name.capitalize(), getImg(id))
+            val pageItems = if (hasTypeFilter) {
+                slice
+            } else {
+                coroutineScope {
+                    slice.map { pokemon ->
+                        async { pokemon.copy(types = getTypes(pokemon.id)) }
+                    }.awaitAll()
+                }
             }
-            Resource.Success(list)
+
+            val result = PokemonPage(
+                pokemons = pageItems,
+                hasMore = endIndex < filteredList.size
+            )
+
+            if (cachedPages.size >= MAX_CACHED_PAGES) cachedPages.clear()
+            cachedPages[cacheKey] = result
+
+            Resource.Success(result)
         } catch (e: Exception) {
-            Resource.Error("Error al cargar datos: ${e.localizedMessage}", e)
+            Resource.Error(mapErrorMessage(e), e)
         }
     }
 
@@ -132,7 +169,18 @@ class PokemonRepositoryImpl @Inject constructor(
                 )
             )
         } catch (e: Exception) {
-            Resource.Error("Error al cargar el detalle", e)
+            Resource.Error(mapErrorMessage(e), e)
+        }
+    }
+
+    private fun mapErrorMessage(e: Exception): String {
+        return when (e) {
+            is java.net.UnknownHostException, is java.io.IOException ->
+                "No hay conexión a Internet. Verifica tu red e intenta nuevamente."
+            is retrofit2.HttpException ->
+                if (e.code() == 404) "No se encontró el Pokémon solicitado."
+                else "Error en el servidor (${e.code()}). Intenta más tarde."
+            else -> e.localizedMessage ?: "Ocurrió un error inesperado al procesar la solicitud."
         }
     }
 
